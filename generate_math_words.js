@@ -515,7 +515,7 @@ function usage() {
 }
 
 function main() {
-  const count = Number.parseInt(process.argv[2] ?? "20", 10);
+  const count = Number.parseInt(process.argv[2] ?? "128", 10);
   const asJson = process.argv.includes("--json");
   const showHalves = process.argv.includes("--show-halves");
   const chaos = process.argv.includes("--chaos");

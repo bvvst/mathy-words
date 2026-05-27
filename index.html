@@ -84,7 +84,8 @@
             }
 
             input[type="number"],
-            input[type="search"] {
+            input[type="search"],
+            textarea {
                 width: 100%;
                 min-height: 44px;
                 border: 1px solid var(--line);
@@ -93,6 +94,30 @@
                 color: var(--ink);
                 font: inherit;
                 padding: 8px 12px;
+            }
+
+            textarea {
+                min-height: 128px;
+                resize: vertical;
+            }
+
+            .dictionary {
+                display: grid;
+                gap: 10px;
+                margin: 0 0 24px;
+            }
+
+            .dictionary-actions {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+
+            .dictionary-status {
+                color: var(--muted);
+                font-size: 0.9rem;
+                font-weight: 700;
             }
 
             .settings {
@@ -236,7 +261,7 @@
                         type="number"
                         min="1"
                         max="500"
-                        value="64"
+                        value="128"
                     />
                 </label>
                 <label class="field">
@@ -250,6 +275,24 @@
                 <button id="generate" type="button">Generate</button>
                 <button id="copy" class="secondary" type="button">Copy</button>
             </section>
+
+            <details class="dictionary">
+                <summary>Custom dictionary</summary>
+                <label class="field">
+                    Source words
+                    <textarea
+                        id="custom-dictionary"
+                        spellcheck="false"
+                        placeholder="one per line, or comma separated"
+                    ></textarea>
+                </label>
+                <div class="dictionary-actions">
+                    <button id="clear-dictionary" class="secondary" type="button">
+                        Use math
+                    </button>
+                    <span id="dictionary-status" class="dictionary-status"></span>
+                </div>
+            </details>
 
             <section class="settings" aria-label="Chaos settings">
                 <label class="toggle">
@@ -292,6 +335,12 @@
             const MathWords = window.MathWordGenerator;
             const countInput = document.querySelector("#count");
             const filterInput = document.querySelector("#filter");
+            const customDictionaryInput =
+                document.querySelector("#custom-dictionary");
+            const clearDictionaryButton =
+                document.querySelector("#clear-dictionary");
+            const dictionaryStatus =
+                document.querySelector("#dictionary-status");
             const generateButton = document.querySelector("#generate");
             const copyButton = document.querySelector("#copy");
             const output = document.querySelector("#output");
@@ -301,10 +350,43 @@
                 ...document.querySelectorAll(".settings input"),
             ];
 
-            function filteredWords() {
+            customDictionaryInput.value =
+                window.localStorage.getItem("math-word-custom-dictionary") ||
+                "";
+
+            function parseCustomDictionary() {
+                return customDictionaryInput.value
+                    .split(/[\n,;]+/)
+                    .map((word) =>
+                        word
+                            .trim()
+                            .replace(/^[-*]\s+/, "")
+                            .replace(/\s+/g, " "),
+                    )
+                    .filter(Boolean);
+            }
+
+            function activeDictionary() {
+                const customWords = parseCustomDictionary();
+                if (customWords.length >= 2) {
+                    return {
+                        words: customWords,
+                        isCustom: true,
+                        customCount: customWords.length,
+                    };
+                }
+
+                return {
+                    words: MathWords.FLATTENED_WORDS,
+                    isCustom: false,
+                    customCount: customWords.length,
+                };
+            }
+
+            function filteredWords(dictionary) {
                 const query = filterInput.value.trim().toLowerCase();
-                if (!query) return MathWords.FLATTENED_WORDS;
-                return MathWords.FLATTENED_WORDS.filter((word) =>
+                if (!query) return dictionary.words;
+                return dictionary.words.filter((word) =>
                     word.toLowerCase().includes(query),
                 );
             }
@@ -329,7 +411,8 @@
                     500,
                     Math.max(1, Number.parseInt(countInput.value, 10) || 1),
                 );
-                const sourceWords = filteredWords();
+                const dictionary = activeDictionary();
+                const sourceWords = filteredWords(dictionary);
                 const usableWords =
                     sourceWords.length >= 2
                         ? sourceWords
@@ -344,7 +427,11 @@
                 notice.textContent =
                     sourceWords.length >= 2
                         ? ""
-                        : "Filter matched fewer than two source words, so the full list was used.";
+                        : "Active source matched fewer than two words, so the default math dictionary was used.";
+
+                dictionaryStatus.textContent = dictionary.isCustom
+                    ? `${dictionary.customCount} custom words`
+                    : "Default math dictionary";
 
                 output.replaceChildren(
                     ...words.map((item) => {
@@ -382,6 +469,18 @@
 
             generateButton.addEventListener("click", render);
             filterInput.addEventListener("input", render);
+            customDictionaryInput.addEventListener("input", () => {
+                window.localStorage.setItem(
+                    "math-word-custom-dictionary",
+                    customDictionaryInput.value,
+                );
+                render();
+            });
+            clearDictionaryButton.addEventListener("click", () => {
+                customDictionaryInput.value = "";
+                window.localStorage.removeItem("math-word-custom-dictionary");
+                render();
+            });
             settingInputs.forEach((input) =>
                 input.addEventListener("change", render),
             );
