@@ -406,17 +406,102 @@ function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function generateNewWords(count, sourceWords = FLATTENED_WORDS) {
+function reverseText(text) {
+  return [...text].reverse().join("");
+}
+
+function randomInteriorIndex(text) {
+  if (text.length <= 2) return 0;
+  return 1 + Math.floor(Math.random() * (text.length - 2));
+}
+
+function mutateWord(word) {
+  const mutations = [
+    (value) => {
+      const index = randomInteriorIndex(value);
+      return `${value.slice(0, index)}${value.slice(index + 1)}`;
+    },
+    (value) => {
+      const index = randomInteriorIndex(value);
+      return `${value.slice(0, index)}${value[index]}${value.slice(index)}`;
+    },
+    (value) => {
+      if (value.length < 4) return value;
+      const index = randomInteriorIndex(value);
+      return `${value.slice(0, index)}${value[index + 1] ?? ""}${value[index]}${value.slice(index + 2)}`;
+    },
+    (value) => {
+      const index = randomInteriorIndex(value);
+      return `${value.slice(0, index)}${randomItem(["x", "q", "z", "v", "y"])}${value.slice(index + 1)}`;
+    },
+  ];
+
+  return randomItem(mutations)(word);
+}
+
+function applyWildCase(word) {
+  return [...word]
+    .map((char) => (Math.random() > 0.58 ? char.toUpperCase() : char))
+    .join("");
+}
+
+function generateNewWords(count, sourceWords = FLATTENED_WORDS, options = {}) {
   const halves = sourceWords.map(splitIntoHalves);
+  const connectorVowels = ["a", "e", "i", "o", "u", "y", "ae", "io"];
   const generated = [];
 
   for (let index = 0; index < count; index += 1) {
     const front = randomItem(halves);
-    const back = randomItem(halves);
+    let back = randomItem(halves);
+
+    if (!options.allowSameSource && halves.length > 1) {
+      let attempts = 0;
+      while (front.term === back.term && attempts < 8) {
+        back = randomItem(halves);
+        attempts += 1;
+      }
+    }
+
+    let frontPart = front.front;
+    let backPart = back.back;
+    const sources = [front.term, back.term];
+
+    if (options.reverseShards) {
+      if (Math.random() > 0.65) frontPart = reverseText(frontPart);
+      if (Math.random() > 0.65) backPart = reverseText(backPart);
+    }
+
+    const pieces = [frontPart];
+
+    if (options.connectorVowel && Math.random() > 0.35) {
+      pieces.push(randomItem(connectorVowels));
+    }
+
+    if (options.extraShard && halves.length > 2) {
+      const shardSource = randomItem(halves);
+      const shard = Math.random() > 0.5 ? shardSource.front : shardSource.back;
+      pieces.push(shard.slice(0, Math.max(1, Math.ceil(shard.length / 2))));
+      sources.push(shardSource.term);
+    }
+
+    pieces.push(backPart);
+
+    let word = pieces.join("").toLowerCase();
+
+    if (options.letterMutation && word.length > 3) {
+      word = mutateWord(word);
+      if (Math.random() > 0.72) word = mutateWord(word);
+    }
+
+    if (options.wildCase) {
+      word = applyWildCase(word);
+    }
+
     generated.push({
-      word: `${front.front}${back.back}`.toLowerCase(),
+      word,
       frontFrom: front.term,
       backFrom: back.term,
+      sources,
     });
   }
 
@@ -424,13 +509,24 @@ function generateNewWords(count, sourceWords = FLATTENED_WORDS) {
 }
 
 function usage() {
-  console.log("Usage: node generate_math_words.js <count> [--json] [--show-halves]");
+  console.log(
+    "Usage: node generate_math_words.js <count> [--json] [--show-halves] [--chaos] [--same-source] [--connector] [--extra-shard] [--mutate] [--reverse] [--wild-case]",
+  );
 }
 
 function main() {
   const count = Number.parseInt(process.argv[2] ?? "20", 10);
   const asJson = process.argv.includes("--json");
   const showHalves = process.argv.includes("--show-halves");
+  const chaos = process.argv.includes("--chaos");
+  const options = {
+    allowSameSource: chaos || process.argv.includes("--same-source"),
+    connectorVowel: chaos || process.argv.includes("--connector"),
+    extraShard: chaos || process.argv.includes("--extra-shard"),
+    letterMutation: chaos || process.argv.includes("--mutate"),
+    reverseShards: chaos || process.argv.includes("--reverse"),
+    wildCase: chaos || process.argv.includes("--wild-case"),
+  };
 
   if (!Number.isInteger(count) || count < 1) {
     usage();
@@ -444,7 +540,7 @@ function main() {
     return;
   }
 
-  const generated = generateNewWords(count);
+  const generated = generateNewWords(count, FLATTENED_WORDS, options);
 
   if (asJson) {
     console.log(JSON.stringify(generated, null, 2));

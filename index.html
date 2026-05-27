@@ -75,7 +75,7 @@
                 padding: 24px 0;
             }
 
-            label {
+            .field {
                 display: grid;
                 gap: 6px;
                 color: var(--muted);
@@ -83,7 +83,8 @@
                 font-weight: 700;
             }
 
-            input {
+            input[type="number"],
+            input[type="search"] {
                 width: 100%;
                 min-height: 44px;
                 border: 1px solid var(--line);
@@ -92,6 +93,40 @@
                 color: var(--ink);
                 font: inherit;
                 padding: 8px 12px;
+            }
+
+            .settings {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+                gap: 10px;
+                margin: 0 0 24px;
+            }
+
+            .toggle {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                min-height: 44px;
+                border: 1px solid var(--line);
+                border-radius: 8px;
+                background: var(--panel);
+                color: var(--ink);
+                cursor: pointer;
+                font-size: 0.9rem;
+                font-weight: 800;
+                padding: 8px 10px;
+            }
+
+            .toggle input {
+                width: 18px;
+                height: 18px;
+                accent-color: var(--accent);
+            }
+
+            .toggle:has(input:checked) {
+                border-color: var(--accent);
+                background: var(--soft);
+                color: var(--accent-strong);
             }
 
             button {
@@ -194,7 +229,7 @@
             </header>
 
             <section class="controls" aria-label="Generator controls">
-                <label>
+                <label class="field">
                     Count
                     <input
                         id="count"
@@ -204,7 +239,7 @@
                         value="64"
                     />
                 </label>
-                <label>
+                <label class="field">
                     Filter source words
                     <input
                         id="filter"
@@ -214,6 +249,33 @@
                 </label>
                 <button id="generate" type="button">Generate</button>
                 <button id="copy" class="secondary" type="button">Copy</button>
+            </section>
+
+            <section class="settings" aria-label="Chaos settings">
+                <label class="toggle">
+                    <input id="same-source" type="checkbox" />
+                    Same source
+                </label>
+                <label class="toggle">
+                    <input id="connector-vowel" type="checkbox" />
+                    Connector vowel
+                </label>
+                <label class="toggle">
+                    <input id="extra-shard" type="checkbox" />
+                    Extra shard
+                </label>
+                <label class="toggle">
+                    <input id="letter-mutation" type="checkbox" />
+                    Letter mutation
+                </label>
+                <label class="toggle">
+                    <input id="reverse-shards" type="checkbox" />
+                    Reverse shards
+                </label>
+                <label class="toggle">
+                    <input id="wild-case" type="checkbox" />
+                    Wild case
+                </label>
             </section>
 
             <p id="notice" class="notice" hidden></p>
@@ -235,6 +297,9 @@
             const output = document.querySelector("#output");
             const halvesOutput = document.querySelector("#halves");
             const notice = document.querySelector("#notice");
+            const settingInputs = [
+                ...document.querySelectorAll(".settings input"),
+            ];
 
             function filteredWords() {
                 const query = filterInput.value.trim().toLowerCase();
@@ -242,6 +307,21 @@
                 return MathWords.FLATTENED_WORDS.filter((word) =>
                     word.toLowerCase().includes(query),
                 );
+            }
+
+            function currentOptions() {
+                return {
+                    allowSameSource:
+                        document.querySelector("#same-source").checked,
+                    connectorVowel:
+                        document.querySelector("#connector-vowel").checked,
+                    extraShard: document.querySelector("#extra-shard").checked,
+                    letterMutation:
+                        document.querySelector("#letter-mutation").checked,
+                    reverseShards:
+                        document.querySelector("#reverse-shards").checked,
+                    wildCase: document.querySelector("#wild-case").checked,
+                };
             }
 
             function render() {
@@ -254,7 +334,11 @@
                     sourceWords.length >= 2
                         ? sourceWords
                         : MathWords.FLATTENED_WORDS;
-                const words = MathWords.generateNewWords(count, usableWords);
+                const words = MathWords.generateNewWords(
+                    count,
+                    usableWords,
+                    currentOptions(),
+                );
 
                 notice.hidden = sourceWords.length >= 2;
                 notice.textContent =
@@ -271,7 +355,7 @@
                         word.textContent = item.word;
 
                         const source = document.createElement("span");
-                        source.textContent = `${item.frontFrom} + ${item.backFrom}`;
+                        source.textContent = item.sources.join(" + ");
 
                         article.append(word, source);
                         return article;
@@ -298,6 +382,9 @@
 
             generateButton.addEventListener("click", render);
             filterInput.addEventListener("input", render);
+            settingInputs.forEach((input) =>
+                input.addEventListener("change", render),
+            );
             copyButton.addEventListener("click", copyWords);
             render();
         </script>
