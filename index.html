@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Math Word Mixer</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #171717;
+        --muted: #60646c;
+        --line: #d8dadd;
+        --paper: #fbfaf7;
+        --panel: #ffffff;
+        --accent: #0d7c66;
+        --accent-strong: #095d4d;
+        --soft: #edf7f4;
+        --warn: #8a5200;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--paper);
+        color: var(--ink);
+        font: 16px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1040px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 32px 0;
+      }
+
+      header {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4.2rem);
+        line-height: 0.96;
+        letter-spacing: 0;
+      }
+
+      .summary {
+        max-width: 360px;
+        margin: 0;
+        color: var(--muted);
+        text-align: right;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) auto auto;
+        gap: 12px;
+        align-items: end;
+        padding: 24px 0;
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 0.85rem;
+        font-weight: 700;
+      }
+
+      input {
+        width: 100%;
+        min-height: 44px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--ink);
+        font: inherit;
+        padding: 8px 12px;
+      }
+
+      button {
+        min-height: 44px;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        background: var(--accent);
+        color: white;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 800;
+        padding: 8px 14px;
+      }
+
+      button.secondary {
+        background: var(--panel);
+        color: var(--accent-strong);
+      }
+
+      button:hover {
+        filter: brightness(0.96);
+      }
+
+      .output {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 10px;
+      }
+
+      .word {
+        min-height: 88px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 12px;
+      }
+
+      .word strong {
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 1.2rem;
+        line-height: 1.1;
+      }
+
+      .word span {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      details {
+        margin-top: 28px;
+        border-top: 1px solid var(--line);
+        padding-top: 18px;
+      }
+
+      summary {
+        cursor: pointer;
+        color: var(--accent-strong);
+        font-weight: 800;
+      }
+
+      pre {
+        overflow: auto;
+        max-height: 420px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 14px;
+        white-space: pre-wrap;
+      }
+
+      .notice {
+        margin: 0 0 16px;
+        color: var(--warn);
+      }
+
+      @media (max-width: 760px) {
+        header,
+        .controls {
+          display: grid;
+          grid-template-columns: 1fr;
+        }
+
+        .summary {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Math Word Mixer</h1>
+        <p class="summary">Randomly combines syllable-aware front halves and back halves from a flattened math vocabulary.</p>
+      </header>
+
+      <section class="controls" aria-label="Generator controls">
+        <label>
+          Count
+          <input id="count" type="number" min="1" max="500" value="24">
+        </label>
+        <label>
+          Filter source words
+          <input id="filter" type="search" placeholder="try algebra, vector, proof...">
+        </label>
+        <button id="generate" type="button">Generate</button>
+        <button id="copy" class="secondary" type="button">Copy</button>
+      </section>
+
+      <p id="notice" class="notice" hidden></p>
+      <section id="output" class="output" aria-live="polite"></section>
+
+      <details>
+        <summary>Show flattened words and halves</summary>
+        <pre id="halves"></pre>
+      </details>
+    </main>
+
+    <script src="./generate_math_words.js"></script>
+    <script>
+      const MathWords = window.MathWordGenerator;
+      const countInput = document.querySelector("#count");
+      const filterInput = document.querySelector("#filter");
+      const generateButton = document.querySelector("#generate");
+      const copyButton = document.querySelector("#copy");
+      const output = document.querySelector("#output");
+      const halvesOutput = document.querySelector("#halves");
+      const notice = document.querySelector("#notice");
+
+      function filteredWords() {
+        const query = filterInput.value.trim().toLowerCase();
+        if (!query) return MathWords.FLATTENED_WORDS;
+        return MathWords.FLATTENED_WORDS.filter((word) => word.toLowerCase().includes(query));
+      }
+
+      function render() {
+        const count = Math.min(500, Math.max(1, Number.parseInt(countInput.value, 10) || 1));
+        const sourceWords = filteredWords();
+        const usableWords = sourceWords.length >= 2 ? sourceWords : MathWords.FLATTENED_WORDS;
+        const words = MathWords.generateNewWords(count, usableWords);
+
+        notice.hidden = sourceWords.length >= 2;
+        notice.textContent = sourceWords.length >= 2
+          ? ""
+          : "Filter matched fewer than two source words, so the full list was used.";
+
+        output.replaceChildren(...words.map((item) => {
+          const article = document.createElement("article");
+          article.className = "word";
+
+          const word = document.createElement("strong");
+          word.textContent = item.word;
+
+          const source = document.createElement("span");
+          source.textContent = `${item.frontFrom} + ${item.backFrom}`;
+
+          article.append(word, source);
+          return article;
+        }));
+
+        halvesOutput.textContent = JSON.stringify(usableWords.map(MathWords.splitIntoHalves), null, 2);
+      }
+
+      async function copyWords() {
+        const words = [...output.querySelectorAll("strong")].map((node) => node.textContent);
+        await navigator.clipboard.writeText(words.join("\n"));
+        copyButton.textContent = "Copied";
+        window.setTimeout(() => {
+          copyButton.textContent = "Copy";
+        }, 900);
+      }
+
+      generateButton.addEventListener("click", render);
+      filterInput.addEventListener("input", render);
+      copyButton.addEventListener("click", copyWords);
+      render();
+    </script>
+  </body>
+</html>
